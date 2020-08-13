@@ -10,16 +10,6 @@ readme = "README.md"
 keywords = ["shunting", "math", "parser", "expression", "eval"]
 categories = ["parsing", "algorithms"]
 
-[features]
-default = ["dynlink-eval"]
-dynlink-eval = ["dylib"]
-
 [dependencies]
-dirs = "1.0"
 lexers = { version = "0.1.2", path = "../lexers" }
-rand = "0.6"
-rustyline = "5.0.0"
-
-[dependencies.dylib]
-version = "0.0.3"
-optional = true
+rand = "0.7.3"

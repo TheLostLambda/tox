@@ -1,7 +1,0 @@
-var start = clock();
-
-while (true) {
-  if ((clock() - start)/1e+9 > 1) {
-    break 2;
-  }
-}
