@@ -1,5 +1,5 @@
 use crate::parser::{precedence, Assoc, RPNExpr};
-use lexers::MathToken;
+use crate::tokenizer::MathToken;
 use std::fmt;
 
 #[derive(Debug, Clone)]
@@ -41,8 +41,8 @@ impl fmt::Display for RPNExpr {
         fn printer(root: &AST) -> (String, (usize, Assoc)) {
             match root {
                 AST::Leaf(ref token) => match *token {
-                    MathToken::Number(ref x) => (format!("{}", x), precedence(token)),
-                    MathToken::Variable(ref x) => (format!("{}", x), precedence(token)),
+                    MathToken::Number(ref x) => (x.to_string(), precedence(token)),
+                    MathToken::Variable(ref x) => (x.to_string(), precedence(token)),
                     _ => unreachable!(),
                 },
                 AST::Node(ref token, ref args) => {
@@ -66,14 +66,14 @@ impl fmt::Display for RPNExpr {
                             {
                                 format!("({})", lhs.0)
                             } else {
-                                format!("{}", lhs.0)
+                                lhs.0
                             };
                             let rh = if prec > (rhs.1).0
                                 || (prec == (rhs.1).0 && assoc != Assoc::Right)
                             {
                                 format!("({})", rhs.0)
                             } else {
-                                format!("{}", rhs.0)
+                                rhs.0
                             };
                             // NOTE: '2+(3+4)' will show parens to indicate that user
                             // explicitly put them there

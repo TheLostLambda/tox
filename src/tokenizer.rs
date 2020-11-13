@@ -1,5 +1,3 @@
-#![deny(warnings)]
-
 use crate::scanner::Scanner;
 
 #[derive(Clone, PartialEq, Debug)]
@@ -28,18 +26,9 @@ impl<I: Iterator<Item = char>> MathTokenizer<I> {
         }
     }
 
-    pub fn scanner(source: I) -> Scanner<Self> {
-        Scanner::new(Self::new(source))
-    }
-
     // when would a minus be unary? we need to know the prev token
     fn makes_unary(prev: &Option<MathToken>) -> bool {
-        match *prev {
-            Some(MathToken::Number(_)) => false,
-            Some(MathToken::Variable(_)) => false,
-            Some(MathToken::CParen) => false,
-            _ => true,
-        }
+        !matches!(*prev, Some(MathToken::Number(_)) | Some(MathToken::Variable(_)) | Some(MathToken::CParen))
     }
 
     fn get_token(&mut self) -> Option<MathToken> {

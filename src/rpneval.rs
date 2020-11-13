@@ -1,5 +1,5 @@
 use crate::parser::RPNExpr;
-use lexers::MathToken;
+use crate::tokenizer::MathToken;
 use std::collections::HashMap;
 
 // a shorthand for checking number of arguments before eval_fn
@@ -8,7 +8,7 @@ macro_rules! nargs {
         if $argcheck {
             $ifok
         } else {
-            Err(format!("Wrong number of arguments"))
+            Err("Wrong number of arguments".to_string())
         }
     };
 }
@@ -20,8 +20,8 @@ impl MathContext {
     pub fn new() -> MathContext {
         use std::f64::consts;
         let mut cx = HashMap::new();
-        cx.insert(format!("pi"), consts::PI);
-        cx.insert(format!("e"), consts::E);
+        cx.insert("pi".to_string(), consts::PI);
+        cx.insert("e".to_string(), consts::E);
         MathContext(cx)
     }
 
@@ -40,8 +40,12 @@ impl MathContext {
                     None => return Err(format!("Unknown Variable: {}", var.to_string())),
                 },
                 MathToken::BOp(ref op) => {
-                    let r = operands.pop().ok_or(format!("Wrong number of arguments"))?;
-                    let l = operands.pop().ok_or(format!("Wrong number of arguments"))?;
+                    let r = operands
+                        .pop()
+                        .ok_or_else(|| "Wrong number of arguments".to_string())?;
+                    let l = operands
+                        .pop()
+                        .ok_or_else(|| "Wrong number of arguments".to_string())?;
                     match &op[..] {
                         "+" => operands.push(l + r),
                         "-" => operands.push(l - r),
@@ -53,7 +57,9 @@ impl MathContext {
                     }
                 }
                 MathToken::UOp(ref op) => {
-                    let o = operands.pop().ok_or(format!("Wrong number of arguments"))?;
+                    let o = operands
+                        .pop()
+                        .ok_or_else(|| "Wrong number of arguments".to_string())?;
                     match &op[..] {
                         "-" => operands.push(-o),
                         "!" => operands.push(Self::eval_fn("tgamma", vec![o + 1.0])?),
@@ -62,7 +68,7 @@ impl MathContext {
                 }
                 MathToken::Function(ref fname, arity) => {
                     if arity > operands.len() {
-                        return Err(format!("Wrong number of arguments"));
+                        return Err("Wrong number of arguments".to_string());
                     }
                     let cut = operands.len() - arity;
                     let args = operands.split_off(cut);
@@ -71,7 +77,9 @@ impl MathContext {
                 _ => return Err(format!("Bad Token: {:?}", *token)),
             }
         }
-        operands.pop().ok_or(format!("Wrong number of arguments"))
+        operands
+            .pop()
+            .ok_or_else(|| "Wrong number of arguments".to_string())
     }
 
     fn eval_fn(fname: &str, args: Vec<f64>) -> Result<f64, String> {
@@ -89,58 +97,85 @@ impl MathContext {
             ),
             "abs" => nargs!(args.len() == 1, Ok(f64::abs(args[0]))),
             "rand" => nargs!(args.len() == 1, Ok(args[0] * rand::random::<f64>())),
-            // Order not important
-            "nCr" => nargs!(args.len() == 2, funcs::combinations(args[0], args[1])),
-            "nMCr" => nargs!(args.len() == 2, funcs::multicombinations(args[0], args[1])),
             // Order is important
-            "nPr" => nargs!(args.len() == 2, funcs::permutations(args[0], args[1])),
             "nMPr" => nargs!(args.len() == 2, Ok(args[0].powf(args[1]))),
-            // Resolve function fname and call it
-            _ => nargs!(args.len() == 1, Ok((mathlink::link_fn(fname)?)(args[0]))),
+            // Unknown function
+            _ => Err(format!("Unknown function: {}", fname)),
         }
     }
 }
 
-mod funcs {
-    use super::mathlink;
-    pub fn combinations(n: f64, r: f64) -> Result<f64, String> {
-        let tgamma = mathlink::link_fn("tgamma")?;
-        Ok(tgamma(n + 1.0) / tgamma(r + 1.0) / tgamma(n - r + 1.0))
-    }
-
-    pub fn multicombinations(n: f64, r: f64) -> Result<f64, String> {
-        let tgamma = mathlink::link_fn("tgamma")?;
-        Ok(tgamma(n + r) / tgamma(r + 1.0) / tgamma(n))
-    }
-
-    pub fn permutations(n: f64, r: f64) -> Result<f64, String> {
-        let tgamma = mathlink::link_fn("tgamma")?;
-        Ok(tgamma(n + 1.0) / tgamma(n - r + 1.0))
+impl Default for MathContext {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
-#[cfg(feature = "dynlink-eval")]
-mod mathlink {
-    use std::mem;
-    pub fn link_fn(fname: &str) -> Result<fn(f64) -> f64, String> {
-        match dylib::DynamicLibrary::open(None) {
-            Ok(lib) => unsafe {
-                match lib.symbol(fname) {
-                    Ok(f) => Ok(mem::transmute::<*mut u8, fn(f64) -> f64>(f)),
-                    Err(e) => Err(e),
-                }
-            },
-            Err(e) => Err(e),
-        }
-    }
-}
+#[cfg(test)]
+mod tests {
+    use super::MathContext;
+    use crate::parser::ShuntingParser;
 
-#[cfg(not(feature = "dynlink-eval"))]
-mod mathlink {
-    pub fn link_fn(fname: &str) -> Result<fn(f64) -> f64, String> {
-        Err(format!(
-            "Dynamic linking not enabled, unknown function: {}",
-            fname
-        ))
+    macro_rules! fuzzy_eq {
+        ($lhs:expr, $rhs:expr) => {
+            assert!(($lhs - $rhs).abs() < 1.0e-10)
+        };
+    }
+
+    #[test]
+    fn test_eval1() {
+        let expr = ShuntingParser::parse_str("3+4*2/-(1-5)^2^3").unwrap();
+        fuzzy_eq!(MathContext::new().eval(&expr).unwrap(), 2.99987792969);
+    }
+
+    #[test]
+    fn test_eval2() {
+        let expr = ShuntingParser::parse_str("3.4e-2 * sin(pi/3)/(541 % -4) * max(2, -7)").unwrap();
+        fuzzy_eq!(MathContext::new().eval(&expr).unwrap(), 0.058889727457341);
+    }
+
+    #[test]
+    fn test_eval3() {
+        let expr = ShuntingParser::parse_str("(-(1-9^2) / (1 + 6^2))^0.5").unwrap();
+        fuzzy_eq!(
+            MathContext::new().eval(&expr).unwrap(),
+            1.470429244187615496759
+        );
+    }
+
+    #[test]
+    fn test_eval4() {
+        let expr = ShuntingParser::parse_str("sin(0.345)^2 + cos(0.345)^2").unwrap();
+        fuzzy_eq!(MathContext::new().eval(&expr).unwrap(), 1.0);
+    }
+
+    #[test]
+    fn test_eval5() {
+        let expr = ShuntingParser::parse_str("sin(e)/cos(e)").unwrap();
+        fuzzy_eq!(MathContext::new().eval(&expr).unwrap(), -0.4505495340698074);
+    }
+
+    #[test]
+    fn test_eval6() {
+        let expr = ShuntingParser::parse_str("(3+4)*3").unwrap();
+        fuzzy_eq!(MathContext::new().eval(&expr).unwrap(), 21.0);
+    }
+
+    #[test]
+    fn test_eval7() {
+        let expr = ShuntingParser::parse_str("(3+4)*3").unwrap();
+        fuzzy_eq!(MathContext::new().eval(&expr).unwrap(), 21.0);
+    }
+
+    #[test]
+    fn test_eval8() {
+        let expr = ShuntingParser::parse_str("2^3").unwrap();
+        fuzzy_eq!(MathContext::new().eval(&expr).unwrap(), 8.0);
+        let expr = ShuntingParser::parse_str("2^-3").unwrap();
+        fuzzy_eq!(MathContext::new().eval(&expr).unwrap(), 0.125);
+        let expr = ShuntingParser::parse_str("-2^3").unwrap();
+        fuzzy_eq!(MathContext::new().eval(&expr).unwrap(), -8.0);
+        let expr = ShuntingParser::parse_str("-2^-3").unwrap();
+        fuzzy_eq!(MathContext::new().eval(&expr).unwrap(), -0.125);
     }
 }

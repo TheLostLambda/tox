@@ -1,9 +1,9 @@
 [package]
-name = "shunting"
+name = "thin-shunting"
 version = "0.0.7"
 edition = "2018"
 license = "MIT"
-authors = ["Rodolfo Granata <warlock.cc@gmail.com>"]
+authors = ["Rodolfo Granata <warlock.cc@gmail.com>", "Brooks J Rady <b.j.rady@gmail.com>"]
 description = "A library for evaluating math expressions"
 repository = "https://github.com/rodolf0/tox/tree/master/shunting"
 readme = "README.md"
@@ -11,5 +11,4 @@ keywords = ["shunting", "math", "parser", "expression", "eval"]
 categories = ["parsing", "algorithms"]
 
 [dependencies]
-lexers = { version = "0.1.2", path = "../lexers" }
 rand = "0.7.3"

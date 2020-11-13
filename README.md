@@ -1,21 +1,26 @@
-# rust crates for parsing stuff
+# Documentation
 
-## lexers
-Tokenizers for math expressions, splitting text, lexing lisp-like stuff, etc.
+A library for evaluating math expressions.
 
-## earlgrey
-An **Early** CFG parser which can extract all trees and handle ambiguous grammars.
+## Published Versions
 
-## shunting
-A tiny *math* parser that understands prefix/infix/postfix operators and functions.
+The trimmed `shunting` crate has has its latest version pushed to crates.io as `thin-shunting`
 
+## Using the library
 
-## kronos
-A library to compute *time expressions* (eg: the 3rd monday of the week).
+```rust
+fn main() {
+  let input = "sin(0.2)^2 + cos(0.2)^2";
+  let expr = ShuntingParser::parse_str(input).unwrap();
+  let result = MathContext::new().eval(&expr).unwrap();
+  println!("{} = {}", expr, result);
+}
+```
 
-## fluxcap
-A binding of **kronos** and **earlgrey** to parse time expressions from text.
+## A MathContext
 
+`MathContext` allows keeping context across multiple invocations to parse and evaluate. You can do this via the `setvar` method.
 
-## misc
-- lisp: a partial rust clone of lispy.
+## Credit
+
+The **vast** majority of the work here was done by Rodolfo Granata <warlock.cc@gmail.com>, I've just trimmed things down and cleaned up the code a little.
